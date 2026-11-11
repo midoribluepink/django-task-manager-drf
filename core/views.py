@@ -3,8 +3,12 @@ from datetime import date
 
 from django.forms.models import model_to_dict
 from django.http import HttpResponseNotAllowed, JsonResponse, HttpResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
 
 from core.models import Tarea
+from core.serializers import TareaModelSerializer
 
 
 def listar_tareas(request):
@@ -255,3 +259,31 @@ def detalle_tarea(request, id):
     if request.method == "DELETE":
         tarea.delete()
         return HttpResponse(status=204)
+
+@api_view(["GET"])
+def estado_api(request):
+    objeto = {
+        "estado": "activo",
+        "framework": "DRF"
+    }
+
+    return Response(objeto)
+
+@api_view(["GET", "POST"])
+def listar_tareas_drf(request):
+
+    if request.method == "GET":
+        tareas = Tarea.objects.all()
+        serializer = TareaModelSerializer(tareas, many=True)
+
+        return Response(serializer.data)
+
+    if request.method == "POST":
+
+        serializer = TareaModelSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
