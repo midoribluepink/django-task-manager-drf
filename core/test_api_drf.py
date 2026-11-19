@@ -148,3 +148,30 @@ class TareaAPIDRFTestsConDatos(TestCase):
         self.assertIsNone(self.tarea2.fecha_limite)
         self.assertEqual("Título actualizado", self.tarea2.titulo)
         self.assertEqual("Descripción actualizada", self.tarea2.descripcion)
+
+    def test_delete_tarea_existente(self):
+
+        tarea_id = self.tarea1.id
+        url = f"/api/tareas-drf/{tarea_id}/"
+
+        self.assertTrue(Tarea.objects.filter(id=tarea_id).exists())
+
+        respuesta = self.client.delete(url)
+
+        self.assertEqual(respuesta.status_code, 204)
+        self.assertEqual(respuesta.content, b"")
+        self.assertFalse(Tarea.objects.filter(id=tarea_id).exists())
+        self.assertTrue(Tarea.objects.filter(id=self.tarea2.id).exists())
+
+    def test_delete_tarea_inexistente(self):
+
+        url = "/api/tareas-drf/999/"
+
+        respuesta = self.client.delete(url)
+        datos_respuesta = respuesta.json()
+
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertIn("detail", datos_respuesta)
+        self.assertTrue(Tarea.objects.filter(id=self.tarea1.id).exists())
+        self.assertTrue(Tarea.objects.filter(id=self.tarea2.id).exists())
+        self.assertEqual(Tarea.objects.count(), 2)

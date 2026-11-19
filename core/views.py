@@ -289,7 +289,7 @@ def listar_tareas_drf(request):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(["GET", "PATCH", "PUT"])
+@api_view(["GET", "PATCH", "PUT", "DELETE"])
 def detalle_tarea_drf(request, id):
     tarea = get_object_or_404(Tarea, id=id)
     if request.method == "GET":
@@ -314,3 +314,7 @@ def detalle_tarea_drf(request, id):
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == "DELETE":
+        tarea.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
