@@ -289,6 +289,28 @@ def listar_tareas_drf(request):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(["GET"])
+@api_view(["GET", "PATCH", "PUT"])
 def detalle_tarea_drf(request, id):
-    pass
+    tarea = get_object_or_404(Tarea, id=id)
+    if request.method == "GET":
+        serializer = TareaModelSerializer(tarea)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == "PATCH":
+        serializer = TareaModelSerializer(tarea, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == "PUT":
+        serializer = TareaModelSerializer(tarea, data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

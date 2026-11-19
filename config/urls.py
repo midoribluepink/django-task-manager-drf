@@ -16,12 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from core.views import listar_tareas, detalle_tarea, estado_api, listar_tareas_drf
+from core.views import listar_tareas, detalle_tarea, estado_api, listar_tareas_drf, detalle_tarea_drf
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/tareas/', listar_tareas),
     path('api/tareas/<int:id>/', detalle_tarea),
     path('api/estado/', estado_api),
-    path('api/tareas-drf/', listar_tareas_drf)
+    path('api/tareas-drf/', listar_tareas_drf),
+    path('api/tareas-drf/<int:id>/', detalle_tarea_drf)
 ]
