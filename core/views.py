@@ -4,13 +4,149 @@ from datetime import date
 from django.forms.models import model_to_dict
 from django.http import HttpResponseNotAllowed, JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework import generics
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 
 from core.models import Tarea
 from core.serializers import TareaModelSerializer
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def quien_soy(request):
+    usuario = request.user
+
+    return Response({
+        "autenticado": usuario.is_authenticated,
+        "usuario": usuario.username if usuario.is_authenticated else None
+    })
+
+
+#----- VISTAS GENÉRICAS DE REST FRAMEWORK ---
+#--------------------------------------------
+
+class DetalleTareaGenericaView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Vista genérica que implementa GET, PUT, PATCH y DELETE a una
+    tarea específica, filtrada mediante el id.
+    Se requiere ser un usuario autenticado para acceder a las tareas
+    asociadas a ese usuario.
+    endpoint: /api/tareas-genericas/id/
+    """
+    permission_classes = [IsAuthenticated]
+    #queryset = Tarea.objects.all()
+    serializer_class = TareaModelSerializer
+    lookup_field = "id"
+
+    def get_queryset(self):
+        return Tarea.objects.filter(usuario=self.request.user) 
+
+class ListaTareasGenericaView(generics.ListCreateAPIView):
+    """
+    Vista genérica que implementa GET para listar todas las tareas
+    y POST para crear una nueva.
+    Se requiere ser un usuario autenticado para acceder a las tareas
+    asociadas a ese usuario.
+    perform_create() asocia la tarea creada en POST con el usuario 
+    que se autenticó previamente.
+    endpoint: /api/tareas-genericas/
+    """
+    permission_classes = [IsAuthenticated]
+    queryset = Tarea.objects.all()
+    serializer_class = TareaModelSerializer
+
+    def get_queryset(self):
+        return Tarea.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+
+#------- FUNCIONES API REST FRAMEWORK -------
+#--------------------------------------------
+
+# Vista de prueba de la API REST
+@api_view(["GET"])
+def estado_api(request):
+    objeto = {
+        "estado": "activo",
+        "framework": "DRF"
+    }
+
+    return Response(objeto)
+
+@api_view(["GET", "POST"])
+def listar_tareas_drf(request):
+    """
+    Vista diseñana para listar todas las tareas mediante GET y
+    crear una nueva tarea mediate POST.
+    endpoint: /api/tareas-drf/
+    """
+
+    # GET para listar todas las tareas
+    if request.method == "GET":
+        tareas = Tarea.objects.all()
+        serializer = TareaModelSerializer(tareas, many=True)
+
+        return Response(serializer.data)
+
+    # POST para crear una tarea nueva
+    if request.method == "POST":
+
+        serializer = TareaModelSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["GET", "PATCH", "PUT", "DELETE"])
+def detalle_tarea_drf(request, id):
+    """
+    Vista diseñada puede ver, modificar, reemplazar y
+    eliminar una tarea específica mediante los métodos:
+    GET, PATCH, PUT Y DELETE.
+    endpoint: /api/tareas-drf/id/
+    """
+
+    tarea = get_object_or_404(Tarea, id=id)
+    
+    # GET para listar la tarea
+    if request.method == "GET":
+        serializer = TareaModelSerializer(tarea)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # PATCH para modificar valores de la tarea
+    if request.method == "PATCH":
+        serializer = TareaModelSerializer(tarea, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # PUT para reempalzar valores de la tarea
+    if request.method == "PUT":
+        serializer = TareaModelSerializer(tarea, data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # DELETE para eliminar la tarea
+    if request.method == "DELETE":
+        tarea.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+#-------- FUNCIONES API (NO REST) -----------
+#--------------------------------------------
 
 def listar_tareas(request):
     """
@@ -260,61 +396,3 @@ def detalle_tarea(request, id):
     if request.method == "DELETE":
         tarea.delete()
         return HttpResponse(status=204)
-
-@api_view(["GET"])
-def estado_api(request):
-    objeto = {
-        "estado": "activo",
-        "framework": "DRF"
-    }
-
-    return Response(objeto)
-
-@api_view(["GET", "POST"])
-def listar_tareas_drf(request):
-
-    if request.method == "GET":
-        tareas = Tarea.objects.all()
-        serializer = TareaModelSerializer(tareas, many=True)
-
-        return Response(serializer.data)
-
-    if request.method == "POST":
-
-        serializer = TareaModelSerializer(data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(["GET", "PATCH", "PUT", "DELETE"])
-def detalle_tarea_drf(request, id):
-    tarea = get_object_or_404(Tarea, id=id)
-    if request.method == "GET":
-        serializer = TareaModelSerializer(tarea)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    if request.method == "PATCH":
-        serializer = TareaModelSerializer(tarea, data=request.data, partial=True)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    if request.method == "PUT":
-        serializer = TareaModelSerializer(tarea, data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    if request.method == "DELETE":
-        tarea.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
