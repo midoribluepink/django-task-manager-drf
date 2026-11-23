@@ -4,18 +4,141 @@ from datetime import date
 from django.forms.models import model_to_dict
 from django.http import HttpResponseNotAllowed, JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import authenticate, login, logout
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from core.models import Tarea
 from core.serializers import TareaModelSerializer
 
+@ensure_csrf_cookie
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def csrf_token(request):
+    return Response(
+        {"message": "Comunicación CSRF establecida"},
+        status=status.HTTP_200_OK
+    )
+
+@csrf_protect
+def iniciar_sesion_no_drf(request):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    try:
+        datos = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "No se pudo leer el objeto JSON"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not isinstance(datos, dict):
+        return JsonResponse(
+            {"error": "Se esperaba un diccionario"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    username = datos.get("username")
+    password = datos.get("password") 
+
+    if not isinstance(username, str) or not isinstance(password, str):
+        return JsonResponse(
+            {"error": "El usuario/contraseña tiene que ser cadenas"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if not username.strip() or not password:
+        return JsonResponse(
+            {"error": "El usuario/contraseña no pueden ser cadenas vacías"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    usuario = authenticate(
+        request,
+        username=username,
+        password=password
+    )
+
+    if usuario is None:
+        return JsonResponse(
+            {"error": "Las credenciales son incorrectas"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    login(request, usuario)
+
+    return JsonResponse(
+        {"username": usuario.username},
+        status=status.HTTP_200_OK
+    )
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def iniciar_sesion(request):
+    """
+    Endpoint que autentica e inicia sesión. La sesión se mantiene
+    activa mediante el uso de una cookie de sesión.
+    endpoint: /api/login/
+    """
+    username = request.data.get("username")
+    password = request.data.get("password")
+
+    if not isinstance(username, str) or not isinstance(password, str):
+        return Response(
+            {"error": "Los campos tienen que ser cadenas de texto"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not username.strip() or not password:
+        return Response(
+            {"error": "El usuario o la contraseña están vacíos"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    usuario = authenticate(
+        request,
+        username=username,
+        password=password
+    )
+
+    if usuario is None:
+        return Response(
+            {"error": "Las credenciales son incorrectas"},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    login(request, usuario)
+
+    return Response(
+        {"username": usuario.username},
+        status=status.HTTP_200_OK
+    )
+
+@csrf_protect
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cerrar_sesion(request):
+    """
+    Endpoit para cerrar sesión: /api/logout/
+    """
+    logout(request)
+    return Response(
+        {"message": "La sesión ha sido cerrada"},
+        status=status.HTTP_200_OK
+    )
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def quien_soy(request):
+    """
+    Devuelve el usuario autenticado y su estado.
+    """
     usuario = request.user
 
     return Response({

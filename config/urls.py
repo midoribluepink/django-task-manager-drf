@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from core.views import listar_tareas, detalle_tarea, estado_api, listar_tareas_drf, detalle_tarea_drf
 from core.views import ListaTareasGenericaView, DetalleTareaGenericaView
-from core.views import quien_soy
+from core.views import quien_soy, iniciar_sesion, cerrar_sesion, csrf_token, iniciar_sesion_no_drf
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,5 +30,8 @@ urlpatterns = [
     path('api/tareas-genericas/', ListaTareasGenericaView.as_view()),
     path('api/tareas-genericas/<int:id>/', DetalleTareaGenericaView.as_view()),
     path('api/quien-soy/', quien_soy),
-    path('api-auth/', include("rest_framework.urls"))
+    path('api-auth/', include("rest_framework.urls")),
+    path('api/login/', iniciar_sesion_no_drf),
+    path('api/logout/', cerrar_sesion),
+    path('api/csrf/', csrf_token),
 ]

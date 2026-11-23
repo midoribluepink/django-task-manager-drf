@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, Client
 from core.models import Tarea
 from rest_framework import status
 from django.contrib.auth import get_user_model
@@ -95,6 +95,116 @@ class AutorizacionTareasTests(TestCase):
         self.tarea_luis.refresh_from_db()
         self.assertEqual(self.tarea_luis.titulo, "Tarea de Luis")
 
+    def test_inicio_sesion(self):
+        url = "/api/login/"
 
+        respuesta = self.client.post(
+            url,
+            data={
+                "username": self.ana.username,
+                "password": "ClaveAna123!"
+            },
+            content_type="application/json"
+        )
 
-        
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(respuesta.json()["username"], "ana")
+
+        respuesta2 = self.client.get("/api/quien-soy/")
+
+        self.assertEqual(respuesta2.status_code, status.HTTP_200_OK)
+        self.assertEqual(respuesta2.json()["usuario"], "ana")
+
+    def test_cierre_sesion(self):
+        url_login = "/api/login/"
+        url_logout = "/api/logout/"
+        url_quien_soy = "/api/quien-soy/"
+
+        respuesta_login = self.client.post(
+            url_login,
+            data={
+                "username": self.ana.username,
+                "password": "ClaveAna123!"
+            },
+            content_type="application/json"
+        )
+
+        self.assertEqual(respuesta_login.status_code, status.HTTP_200_OK)
+
+        respuesta_quien_soy = self.client.get("/api/quien-soy/")
+
+        self.assertEqual(respuesta_quien_soy.status_code, status.HTTP_200_OK)
+        self.assertEqual("ana", respuesta_quien_soy.json()["usuario"])
+
+        respuesta_logout = self.client.post(url_logout)
+
+        self.assertEqual(respuesta_logout.status_code, status.HTTP_200_OK)
+
+        respuesta_despues_logout = self.client.get(url_quien_soy)
+        self.assertEqual(respuesta_despues_logout.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_obtener_cookie_csrf(self):
+        respuesta = self.client.get("/api/csrf/")
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertIn("csrftoken", respuesta.cookies)
+        self.assertTrue(respuesta.cookies["csrftoken"].value)
+
+    def test_login_sin_csrf(self):
+        cliente = Client(enforce_csrf_checks=True)
+
+        respuesta = cliente.post(
+            "/api/login/",
+            data={
+                "username": self.ana.username,
+                "password": "ClaveAna123!"
+            },
+            content_type="application/json"
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_login_con_csrf(self):
+        cliente = Client(enforce_csrf_checks=True)
+
+        respuesta_csrf = cliente.get("/api/csrf/")
+
+        self.assertEqual(respuesta_csrf.status_code, status.HTTP_200_OK)
+
+        token = cliente.cookies["csrftoken"].value 
+
+        respuesta_login = cliente.post(
+            "/api/login/",
+            data={
+                "username": "ana",
+                "password": "ClaveAna123!"
+            },
+            content_type="application/json",
+            headers={"X-CSRFToken": token}
+        )
+
+        self.assertEqual(respuesta_login.status_code, status.HTTP_200_OK)
+
+        respuesta_quien_soy = cliente.get("/api/quien-soy/")
+
+        self.assertEqual(respuesta_quien_soy.status_code, status.HTTP_200_OK)
+        self.assertEqual("ana", respuesta_quien_soy.json()["usuario"])
+
+    def test_login_con_csrf_invalido(self):
+        cliente = Client(enforce_csrf_checks=True)
+
+        respuesta_csrf = cliente.get("/api/csrf/")
+
+        self.assertEqual(respuesta_csrf.status_code, status.HTTP_200_OK)
+
+        respuesta_login = cliente.post(
+            "/api/login/",
+            data={
+                "username": "ana",
+                "password": "ClaveAna123!"
+            },
+            content_type="application/json",
+            headers={"X-CSRFToken": "tokeninvalido"}
+        )
+
+        self.assertEqual(respuesta_login.status_code, status.HTTP_403_FORBIDDEN)
